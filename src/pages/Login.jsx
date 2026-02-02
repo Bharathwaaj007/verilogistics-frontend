@@ -23,8 +23,10 @@ const handleSubmit = (e) => {
 
   if (username.trim() === 'admin' && password.trim() === 'password123') {
     localStorage.setItem('isHubLoggedIn', 'true');
+    console.log('Flag set:', localStorage.getItem('isHubLoggedIn')); // debug
+
     navigate('/hub', { replace: true });
-    setErrorOpen(false);
+    window.location.href = '/hub'; // force full reload to re-check auth
   } else {
     setErrorOpen(true);
   }

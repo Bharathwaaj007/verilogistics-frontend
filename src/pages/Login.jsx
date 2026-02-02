@@ -18,36 +18,17 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [errorOpen, setErrorOpen] = useState(false);
 
-  const handleSubmit = (e) => {
-<<<<<<< HEAD
+const handleSubmit = (e) => {
   e.preventDefault();
 
   if (username.trim() === 'admin' && password.trim() === 'password123') {
     localStorage.setItem('isHubLoggedIn', 'true');
-    console.log('Login SUCCESS - flag set to true'); // for debugging
-
-    // Force navigation + reload to ensure route protection sees the change
     navigate('/hub', { replace: true });
-    window.location.href = '/hub'; // extra force reload (temporary for demo)
+    setErrorOpen(false);
   } else {
     setErrorOpen(true);
-    console.log('Login FAILED - wrong credentials');
   }
 };
-=======
-    e.preventDefault();
-
-    // Demo credentials check
-    if (username.trim() === 'admin' && password.trim() === 'password123') {
-      localStorage.setItem('isHubLoggedIn', 'true');
-      navigate('/hub', { replace: true });
-      setErrorOpen(false);
-    } else {
-      setErrorOpen(true);
-    }
-  };
->>>>>>> d99357b06c420c1ce4f436a6341d35b4ade5f133
-
   return (
     <Box
       sx={{

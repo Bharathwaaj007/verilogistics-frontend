@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box, Grid, Typography, Avatar, Button, List, ListItem, ListItemAvatar, ListItemText, Divider } from '@mui/material'
+import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import { socket, connectSocket, disconnectSocket } from '../services/socket'
 
 const SAMPLE_LOGS = [
@@ -209,6 +210,9 @@ function HubDashboard() {
   const [countA, setCountA] = useState(0)
   const [countB, setCountB] = useState(0)
 
+  // Live Parcel Scan counter
+  const [parcelCount, setParcelCount] = useState(0)
+
   useEffect(() => {
     // Connect socket on mount
     connectSocket()
@@ -220,11 +224,19 @@ function HubDashboard() {
       else if (data.company === 'B') setCountB((c) => c + 1)
     }
 
+    function handleParcelScan(data) {
+      const count = data?.objectsDetected ?? data?.count ?? 1
+      setParcelCount((c) => c + count)
+      console.log('new-parcel-scan', data)
+    }
+
     socket.on('new-scan', handleNewScan)
+    socket.on('new-parcel-scan', handleParcelScan)
 
     return () => {
       // cleanup listener and disconnect socket
       socket.off('new-scan', handleNewScan)
+      socket.off('new-parcel-scan', handleParcelScan)
       disconnectSocket()
     }
   }, [])
@@ -239,6 +251,55 @@ function HubDashboard() {
         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
           Monitor inbound and outbound flows, dwell times, and verification flags at your consolidation hub.
         </Typography>
+      </Box>
+
+      {/* Live Parcel Scan Count (premium card) */}
+      <Box sx={{ mb: 4, width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <Box
+          sx={{
+            ...glassCardBase,
+            maxWidth: 480,
+            width: '100%',
+            borderRadius: '28px',
+            p: { xs: 3, sm: 5 },
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 0 0 0 rgba(0,212,255,0.0)',
+            border: '2px solid rgba(0,212,255,0.18)',
+            animation: 'fadeInParcel 0.8s cubic-bezier(.4,1.4,.6,1) both',
+            transition: 'box-shadow 0.25s, border-color 0.25s, transform 0.22s',
+            '&:hover': {
+              transform: 'translateY(-4px) scale(1.025)',
+              boxShadow: '0 0 64px 0 rgba(0,212,255,0.32), 0 18px 80px rgba(0,212,255,0.10)',
+              borderColor: '#00d4ff',
+            },
+            '@keyframes fadeInParcel': {
+              '0%': { opacity: 0, transform: 'translateY(24px) scale(0.98)' },
+              '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+            <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
+            <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 800, letterSpacing: '0.04em', mb: 0.5, textShadow: '0 0 16px #00d4ff33' }}>
+              Live Parcel Scans
+            </Typography>
+          </Box>
+          <Typography
+            variant="h1"
+            sx={{
+              fontWeight: 900,
+              color: '#00d4ff',
+              textShadow: '0 0 48px #00d4ff, 0 0 16px #00d4ff99',
+              fontSize: { xs: '2.8rem', sm: '3.6rem', md: '4.2rem' },
+              mb: 0.5,
+              lineHeight: 1.1,
+            }}
+          >
+            {parcelCount}
+          </Typography>
+        </Box>
       </Box>
 
       {/* Live QR Scan Counts */}

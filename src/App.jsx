@@ -41,7 +41,11 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<PageWrap><Login /></PageWrap>} />
           <Route path="/seller" element={<PageWrap><SellerDashboard /></PageWrap>} />
-          <Route path="/hub" element={localStorage.getItem('isHubLoggedIn') === 'true' ? <PageWrap><HubDashboard /></PageWrap> : <Navigate to="/login" replace />} />
+          <Route
+  path="/hub"
+  element={<PageWrap><HubDashboard /></PageWrap>}  // ← remove the ternary for now
+  // element={localStorage.getItem('isHubLoggedIn') === 'true' ? <PageWrap><HubDashboard /></PageWrap> : <Navigate to="/login" replace />}
+/>
           <Route path="/carrier" element={<PageWrap><CarrierDashboard /></PageWrap>} />
         </Routes>
       </Box>

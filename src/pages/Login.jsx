@@ -22,12 +22,10 @@ const handleSubmit = (e) => {
   e.preventDefault();
 
   if (username.trim() === 'admin' && password.trim() === 'password123') {
-    localStorage.setItem('isHubLoggedIn', 'true');
-    console.log('Flag set:', localStorage.getItem('isHubLoggedIn')); // debug
-
-    navigate('/hub', { replace: true });
-    window.location.href = '/hub'; // force full reload to re-check auth
-  } else {
+  localStorage.setItem('isHubLoggedIn', 'true');
+  navigate('/hub', { replace: true });
+  setTimeout(() => window.location.href = '/hub', 100); // force reload to re-check auth
+}else {
     setErrorOpen(true);
   }
 };

@@ -37,6 +37,7 @@ function App() {
           width: '100%',
         }}
       >
+        console.log('Auth check on render:', localStorage.getItem('isHubLoggedIn'));
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<PageWrap><Login /></PageWrap>} />

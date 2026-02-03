@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Box,
   Grid,
   Typography,
   TextField,
-  Slider,
   CircularProgress,
   Button,
   MenuItem,
   Snackbar,
   Alert,
 } from '@mui/material'
-import LocalShippingIcon from '@mui/icons-material/LocalShipping'
-import { socket, connectSocket, disconnectSocket } from '../services/socket'
+
 
 import {
   BarChart,
@@ -73,56 +71,7 @@ function CarrierDashboard() {
   const [progress] = useState(38)
   const [snackOpen, setSnackOpen] = useState(false)
 
-  // Live parcel detection counters (ESP32 Cam)
-  const [countA, setCountA] = useState(0)
-  const [countB, setCountB] = useState(0)
 
-  useEffect(() => {
-    // Avoid SSR
-    if (typeof window === 'undefined') return
-
-    if (!socket || !connectSocket) {
-      console.warn('CarrierDashboard: socket API not available')
-      return
-    }
-
-    try {
-      connectSocket()
-    } catch (err) {
-      console.error('Error connecting socket:', err)
-    }
-
-    const handleParcelScan = (data) => {
-      try {
-        console.log('new-parcel-scan received:', data)
-        const inc = data?.objectsDetected ?? data?.count ?? 1
-        if (data?.company === 'A') setCountA((c) => c + inc)
-        else if (data?.company === 'B') setCountB((c) => c + inc)
-      } catch (err) {
-        console.error('Error in new-parcel-scan handler:', err)
-      }
-    }
-
-    try {
-      socket.on('new-parcel-scan', handleParcelScan)
-    } catch (err) {
-      console.error('Error registering socket listener:', err)
-    }
-
-    return () => {
-      try {
-        socket.off('new-parcel-scan', handleParcelScan)
-      } catch (err) {
-        console.error('Error removing socket listener:', err)
-      }
-
-      try {
-        disconnectSocket()
-      } catch (err) {
-        console.error('Error disconnecting socket:', err)
-      }
-    }
-  }, [])
 
   const handleFleetChange = (key) => (e) => setFleet((s) => ({ ...s, [key]: e.target.value }))
   const handleConfirm = (e) => {
@@ -146,51 +95,7 @@ function CarrierDashboard() {
         </Typography>
       </Box>
 
-      {/* Live Parcel Detections (ESP32 Cam) */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f1f5f9', mb: 1 }}>
-          Live Parcel Detections (ESP32 Cam)
-        </Typography>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <Box
-              sx={{
-                ...glassCardBase,
-                p: 3,
-                textAlign: 'center',
-                border: '2px solid rgba(0,212,255,0.18)',
-              }}
-            >
-              <LocalShippingIcon sx={{ fontSize: 44, color: '#00d4ff', mb: 1 }} />
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block' }}>
-                Company A
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1 }}>
-                {countA}
-              </Typography>
-            </Box>
-          </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <Box
-              sx={{
-                ...glassCardBase,
-                p: 3,
-                textAlign: 'center',
-                border: '2px solid #ff6bcb',
-              }}
-            >
-              <LocalShippingIcon sx={{ fontSize: 44, color: '#ff6bcb', mb: 1 }} />
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block' }}>
-                Company B
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff6bcb', mt: 1 }}>
-                {countB}
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Box>
 
       <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
         {/* Left: Fleet Deployment */}

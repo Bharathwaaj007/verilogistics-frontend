@@ -72,14 +72,16 @@ function CarrierDashboard() {
   const [progress] = useState(38)
   const [snackOpen, setSnackOpen] = useState(false)
 
-  // Live parcel detection counters (ESP32 Cam / OpenCV)
+  console.log('CarrierDashboard mounted')
+
+  // Live parcel detection counters (cleaned, safe implementation)
   const [countA, setCountA] = useState(0)
   const [countB, setCountB] = useState(0)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!socket || !connectSocket) {
-      console.warn('CarrierDashboard: socket API not available')
+    // Safety: SSR and socket availability check
+    if (typeof window === 'undefined' || !socket || !connectSocket) {
+      console.warn('CarrierDashboard: socket unavailable - skipping live parcel setup')
       return
     }
 
@@ -91,27 +93,28 @@ function CarrierDashboard() {
 
     const handleParcelScan = (data) => {
       try {
-        console.log('new-parcel-scan received:', data)
+        console.log('Parcel scan received:', data)
         const inc = data?.objectsDetected ?? 1
         if (data?.company === 'A') setCountA((c) => c + inc)
         else if (data?.company === 'B') setCountB((c) => c + inc)
       } catch (err) {
-        console.error('Error in new-parcel-scan handler:', err)
+        console.error('Error handling parcel scan:', err)
       }
     }
 
     try {
       socket.on('new-parcel-scan', handleParcelScan)
     } catch (err) {
-      console.error('Error registering socket listener:', err)
+      console.error('Error registering parcel listener:', err)
     }
 
     return () => {
       try {
         socket.off('new-parcel-scan', handleParcelScan)
       } catch (err) {
-        console.error('Error removing socket listener:', err)
+        console.error('Error removing parcel listener:', err)
       }
+
       try {
         disconnectSocket()
       } catch (err) {
@@ -142,22 +145,23 @@ function CarrierDashboard() {
         </Typography>
       </Box>
 
-      {/* Live Parcel Detections (ESP32 Cam) */}
+      {/* Live Parcel Detections (ESP32 Cam) — safe, stable UI */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#f1f5f9', mb: 2 }}>Live Parcel Detections (ESP32 Cam)</Typography>
-        <Grid container spacing={2}>
+        <Grid container spacing={2} alignItems="stretch">
           <Grid item xs={12} sm={6}>
-            <Box sx={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease', animation: 'fadeIn 0.8s cubic-bezier(.2,.9,.3,1) both', '&:hover': { transform: 'translateY(-6px) scale(1.02)', boxShadow: '0 24px 64px rgba(0,212,255,0.24), 0 0 64px rgba(0,212,255,0.18)', borderColor: '#00d4ff' }, '@keyframes fadeIn': { '0%': { opacity: 0, transform: 'translateY(12px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } } }}>
+            <Box sx={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.9), rgba(30,41,59,0.75))', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease', animation: 'fadeIn 0.7s ease both', '&:hover': { transform: 'translateY(-6px) scale(1.02)', boxShadow: '0 30px 80px rgba(0,212,255,0.18)', borderColor: '#00d4ff' } }}>
               <LocalShippingIcon sx={{ fontSize: 44, color: '#00d4ff', mb: 1, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block', fontWeight: 800, letterSpacing: '0.12em' }}>Company A</Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1, fontSize: '2.8rem', textShadow: '0 0 28px rgba(0,212,255,0.45)' }}>{countA}</Typography>
+              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1, fontSize: '2.4rem', textShadow: '0 0 28px rgba(0,212,255,0.35)' }}>{countA}</Typography>
             </Box>
           </Grid>
+
           <Grid item xs={12} sm={6}>
-            <Box sx={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease', animation: 'fadeIn 0.9s cubic-bezier(.2,.9,.3,1) both', '&:hover': { transform: 'translateY(-6px) scale(1.02)', boxShadow: '0 24px 64px rgba(255,107,203,0.22), 0 0 64px rgba(255,107,203,0.14)', borderColor: '#ff6bcb' }, '@keyframes fadeIn': { '0%': { opacity: 0, transform: 'translateY(12px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } } }}>
+            <Box sx={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.9), rgba(30,41,59,0.75))', backdropFilter: 'blur(20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease', animation: 'fadeIn 0.85s ease both', '&:hover': { transform: 'translateY(-6px) scale(1.02)', boxShadow: '0 30px 80px rgba(255,107,203,0.14)', borderColor: '#ff6bcb' } }}>
               <LocalShippingIcon sx={{ fontSize: 44, color: '#ff6bcb', mb: 1, filter: 'drop-shadow(0 0 16px #ff6bcb44)' }} />
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block', fontWeight: 800, letterSpacing: '0.12em' }}>Company B</Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff6bcb', mt: 1, fontSize: '2.8rem', textShadow: '0 0 28px rgba(255,107,203,0.35)' }}>{countB}</Typography>
+              <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff6bcb', mt: 1, fontSize: '2.4rem', textShadow: '0 0 28px rgba(255,107,203,0.28)' }}>{countB}</Typography>
             </Box>
           </Grid>
         </Grid>

@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { Box, Grid, Typography, Avatar, Button, List, ListItem, ListItemAvatar, ListItemText, Divider } from '@mui/material'
-import LocalShippingIcon from '@mui/icons-material/LocalShipping'
-import { socket, connectSocket, disconnectSocket } from '../services/socket'
 
 const SAMPLE_LOGS = [
   {
@@ -61,90 +59,12 @@ const statusDot = {
 }
 
 function SimpleLeafletMap({ height = 360 }) {
-  const mapRef = useRef(null)
-  const mapInstance = useRef(null)
-
-  useEffect(() => {
-    const init = () => {
-      if (!mapRef.current || mapInstance.current) return
-
-      const L = window.L
-      if (!L) {
-        console.warn('Leaflet not loaded yet')
-        return
-      }
-
-      try {
-        mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView([11.0168, 76.9558], 9)
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(mapInstance.current)
-
-        const markers = [
-          { coords: [11.0168, 76.9558], label: 'Coimbatore' },
-          { coords: [11.1083, 77.346], label: 'Tiruppur' },
-          { coords: [11.341, 77.7172], label: 'Erode' },
-        ]
-
-        markers.forEach((m) => {
-          L.marker(m.coords).addTo(mapInstance.current).bindPopup(m.label)
-        })
-
-        const routeCoords = markers.map((m) => m.coords)
-        L.polyline(routeCoords, { color: '#00d4ff', weight: 3, opacity: 0.85 }).addTo(mapInstance.current)
-      } catch (err) {
-        console.error('Leaflet init error:', err)
-      }
-    }
-
-    // Load Leaflet if not already loaded
-    if (typeof window !== 'undefined' && window.L) {
-      init()
-    } else {
-      // Load Leaflet CSS
-      if (!document.querySelector('link[href*="leaflet.css"]')) {
-        const link = document.createElement('link')
-        link.rel = 'stylesheet'
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-        document.head.appendChild(link)
-      }
-
-      // Load Leaflet JS and init when ready
-      if (!document.querySelector('script[src*="leaflet.js"]')) {
-        const script = document.createElement('script')
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-        script.async = true
-        script.onload = init
-        script.onerror = () => console.error('Failed to load Leaflet')
-        document.body.appendChild(script)
-      } else {
-        // If script is already loading, wait for onload
-        const existingScript = document.querySelector('script[src*="leaflet.js"]')
-        if (existingScript) {
-          if (existingScript.onload) {
-            const oldOnload = existingScript.onload
-            existingScript.onload = () => {
-              oldOnload()
-              init()
-            }
-          } else {
-            existingScript.onload = init
-          }
-        }
-      }
-    }
-
-    // Cleanup
-    return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove()
-        mapInstance.current = null
-      }
-    }
-  }, [])
-
-  return <Box ref={mapRef} sx={{ height, borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }} />
+  // Reverted to a simple placeholder to avoid runtime CDN/map issues in production.
+  return (
+    <Box sx={{ height, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
+      <Typography sx={{ color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>Map coming soon</Typography>
+    </Box>
+  )
 }
 
 function SimpleCalendar({ monthDays = 28, events = [] }) {
@@ -215,85 +135,9 @@ function HubDashboard() {
     { id: 'evt-bc99-2', day: 21, title: 'Shipment BC-99 Deployment' },
   ]
 
-  // Live QR Scan counters
-  const [countA, setCountA] = useState(0)
-  const [countB, setCountB] = useState(0)
+  // Live socket-based features disabled — reverted to stable UI
 
-  // Live Parcel Scan counter
-  const [parcelCount, setParcelCount] = useState(0)
 
-  // Mount log for diagnostics
-  console.log('HubDashboard mounted')
-
-  useEffect(() => {
-    // Avoid running socket code during SSR or when socket isn't available
-    if (typeof window === 'undefined') {
-      console.warn('HubDashboard: window is undefined (SSR) — skipping socket setup')
-      return
-    }
-    if (!socket || !connectSocket) {
-      console.warn('HubDashboard: socket API not available')
-      return
-    }
-
-    try {
-      connectSocket()
-    } catch (err) {
-      console.error('Error connecting socket:', err)
-    }
-
-    const handleNewScan = (data) => {
-      try {
-        console.log('new-scan', data)
-        if (!data || !data.company) return
-        if (data.company === 'A') setCountA((c) => c + 1)
-        else if (data.company === 'B') setCountB((c) => c + 1)
-      } catch (err) {
-        console.error('Error handling new-scan:', err)
-      }
-    }
-
-    const handleParcelScan = (data) => {
-      try {
-        const count = data?.objectsDetected ?? data?.count ?? 1
-        setParcelCount((c) => c + count)
-        console.log('new-parcel-scan', data)
-      } catch (err) {
-        console.error('Error handling new-parcel-scan:', err)
-      }
-    }
-
-    try {
-      socket.on('new-scan', handleNewScan)
-      socket.on('new-parcel-scan', handleParcelScan)
-    } catch (err) {
-      console.error('Error registering socket listeners:', err)
-    }
-
-    return () => {
-      try {
-        socket.off('new-scan', handleNewScan)
-        socket.off('new-parcel-scan', handleParcelScan)
-      } catch (err) {
-        console.error('Error during socket cleanup:', err)
-      }
-
-      try {
-        disconnectSocket()
-      } catch (err) {
-        console.error('Error disconnecting socket:', err)
-      }
-    }
-  }, [])
-
-  // Loading state if map or socket is not ready
-  if (typeof window === 'undefined' || !socket) {
-    return (
-      <Box sx={{ fontFamily: '"Inter", sans-serif', p: 3 }}>
-        <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>Loading Hub Dashboard...</Typography>
-      </Box>
-    )
-  }
 
   return (
     <Box sx={{ fontFamily: '"Inter", sans-serif' }}>
@@ -307,80 +151,9 @@ function HubDashboard() {
         </Typography>
       </Box>
 
-      {/* Live Parcel Scan Count */}
-      <Box sx={{ mb: 4, width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <Box
-          sx={{
-            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)',
-            backdropFilter: 'blur(22px)',
-            borderRadius: '28px',
-            border: '1px solid rgba(255,255,255,0.04)',
-            p: { xs: 3, sm: 5 },
-            textAlign: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: '0 0 0 0 rgba(0,212,255,0.0)',
-            border: '2px solid rgba(0,212,255,0.18)',
-            animation: 'fadeInParcel 0.8s cubic-bezier(.4,1.4,.6,1) both',
-            transition: 'box-shadow 0.25s, border-color 0.25s, transform 0.22s',
-            '&:hover': {
-              transform: 'translateY(-4px) scale(1.025)',
-              boxShadow: '0 0 64px 0 rgba(0,212,255,0.32), 0 18px 80px rgba(0,212,255,0.10)',
-              borderColor: '#00d4ff',
-            },
-            '@keyframes fadeInParcel': {
-              '0%': { opacity: 0, transform: 'translateY(24px) scale(0.98)' },
-              '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
-            },
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-            <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
-            <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 800, letterSpacing: '0.04em', mb: 0.5, textShadow: '0 0 16px #00d4ff33' }}>
-              Live Parcel Scans
-            </Typography>
-          </Box>
-          <Typography
-            variant="h1"
-            sx={{
-              fontWeight: 900,
-              color: '#00d4ff',
-              textShadow: '0 0 48px #00d4ff, 0 0 16px #00d4ff99',
-              fontSize: { xs: '2.8rem', sm: '3.6rem', md: '4.2rem' },
-              mb: 0.5,
-              lineHeight: 1.1,
-            }}
-          >
-            {parcelCount}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Live QR Scan Counts */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 2 }}>
-          Live QR Scan Counts
-        </Typography>
-
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 0.22s', '&:hover': { transform: 'scale(1.02)' } }}>
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
-                Company A
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1 }}>{countA}</Typography>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 0.22s', '&:hover': { transform: 'scale(1.02)' } }}>
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
-                Company B
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff6bcb', mt: 1 }}>{countB}</Typography>
-            </Box>
-          </Grid>
-        </Grid>
+      {/* Live scanning features are disabled for stability */}
+      <Box sx={{ mb: 4 }}>
+        <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>Real-time scanning features are currently disabled for stability.</Typography>
       </Box>
 
       {/* Top stats row */}

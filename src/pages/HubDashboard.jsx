@@ -84,65 +84,71 @@ function SimpleLeafletMap({ height = 360 }) {
   const mapInstance = useRef(null)
 
   useEffect(() => {
-  let mapInstance = null;
+    const init = () => {
+      try {
+        if (!mapRef.current || mapInstance.current) return
 
-  const init = () => {
-    if (!mapRef.current || mapInstance) return;
+        const L = window.L
+        if (!L) return
 
-    const L = window.L;
+        mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView([11.0168, 76.9558], 9)
 
-    mapInstance = L.map(mapRef.current, { zoomControl: false }).setView([11.0168, 76.9558], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(mapInstance.current)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(mapInstance);
+        const markers = [
+          { coords: [11.0168, 76.9558], label: 'Coimbatore' },
+          { coords: [11.1083, 77.346], label: 'Tiruppur' },
+          { coords: [11.341, 77.7172], label: 'Erode' },
+        ]
 
-    const markers = [
-      { coords: [11.0168, 76.9558], label: 'Coimbatore' },
-      { coords: [11.1083, 77.346], label: 'Tiruppur' },
-      { coords: [11.341, 77.7172], label: 'Erode' },
-    ];
+        markers.forEach((m) => {
+          L.marker(m.coords).addTo(mapInstance.current).bindPopup(m.label)
+        })
 
-    markers.forEach((m) => {
-      L.marker(m.coords).addTo(mapInstance).bindPopup(m.label);
-    });
-
-    const routeCoords = markers.map((m) => m.coords);
-    L.polyline(routeCoords, { color: '#00d4ff', weight: 3, opacity: 0.85 }).addTo(mapInstance);
-  };
-
-  // Check if Leaflet is already loaded
-  if (typeof window !== 'undefined' && window.L) {
-    init();
-  } else {
-    // Load Leaflet CSS if not present
-    if (!document.querySelector('link[href*="leaflet.css"]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
+        const routeCoords = markers.map((m) => m.coords)
+        L.polyline(routeCoords, { color: '#00d4ff', weight: 3, opacity: 0.85 }).addTo(mapInstance.current)
+      } catch (err) {
+        console.error('Leaflet init error:', err)
+      }
     }
 
-    // Load Leaflet JS and initialize when ready
-    if (!document.querySelector('script[src*="leaflet.js"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.async = true;
-      script.onload = init;
-      script.onerror = () => console.error('Failed to load Leaflet');
-      document.body.appendChild(script);
-    }
-  }
+    // Check if Leaflet is already loaded
+    if (typeof window !== 'undefined' && window.L) {
+      init()
+    } else {
+      // Load Leaflet CSS if not present
+      if (!document.querySelector('link[href*="leaflet.css"]')) {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+        document.head.appendChild(link)
+      }
 
-  // Cleanup on unmount
-  return () => {
-    if (mapInstance) {
-      mapInstance.remove();
-      mapInstance = null;
+      // Load Leaflet JS and initialize when ready
+      if (!document.querySelector('script[src*="leaflet.js"]')) {
+        const script = document.createElement('script')
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+        script.async = true
+        script.onload = init
+        script.onerror = () => console.error('Failed to load Leaflet')
+        document.body.appendChild(script)
+      }
     }
-  };
-}, []); // Empty dependency array - run once on mount
-  
+
+    // Cleanup on unmount
+    return () => {
+      try {
+        if (mapInstance.current) {
+          mapInstance.current.remove()
+          mapInstance.current = null
+        }
+      } catch (err) {
+        console.error('Leaflet cleanup error:', err)
+      }
+    }
+  }, []) // Empty dependency array - run once on mount
 
   return <Box ref={mapRef} sx={{ height, borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }} />
 }
@@ -346,7 +352,13 @@ function HubDashboard() {
             }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
+              {/* Guarded icon: ensure it's a valid React component */}
+              {typeof LocalShippingIcon === 'function' || (typeof LocalShippingIcon === 'object' && LocalShippingIcon !== null) ? (
+                <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
+              ) : (
+                <Box sx={{ fontSize: 32, color: '#00d4ff', mb: 0.5 }}>🚚</Box>
+              )}
+
               <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 800, letterSpacing: '0.04em', mb: 0.5, textShadow: '0 0 16px #00d4ff33' }}>
                 Live Parcel Scans
               </Typography>

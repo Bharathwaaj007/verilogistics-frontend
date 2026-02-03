@@ -40,25 +40,6 @@ const HUB_METRICS = [
   { label: 'Staff', value: '88' },
 ]
 
-const cyanGlow = '0 0 40px rgba(0, 212, 255, 0.18)'
-const strongCyan = 'rgba(0,212,255,0.26)'
-const orangeAccent = '#ff6200'
-const glassCardBase = {
-  background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)',
-  backdropFilter: 'blur(22px)',
-  WebkitBackdropFilter: 'blur(22px)',
-  borderRadius: '20px',
-  border: '1px solid rgba(255,255,255,0.04)',
-  padding: 24,
-  transition: 'transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease',
-  fontFamily: '"Inter", sans-serif',
-  '&:hover': {
-    transform: 'scale(1.02)',
-    boxShadow: `0 28px 80px rgba(0, 0, 0, 0.45), ${cyanGlow}`,
-    borderColor: strongCyan,
-  },
-} 
-
 const statusConfig = {
   passed: { label: 'PASS', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.28)' },
   warning: { label: 'WARNING', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', border: 'rgba(249, 115, 22, 0.28)' },
@@ -85,16 +66,19 @@ function SimpleLeafletMap({ height = 360 }) {
 
   useEffect(() => {
     const init = () => {
+      if (!mapRef.current || mapInstance.current) return
+
+      const L = window.L
+      if (!L) {
+        console.warn('Leaflet not loaded yet')
+        return
+      }
+
       try {
-        if (!mapRef.current || mapInstance.current) return
-
-        const L = window.L
-        if (!L) return
-
         mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView([11.0168, 76.9558], 9)
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(mapInstance.current)
 
         const markers = [
@@ -114,11 +98,11 @@ function SimpleLeafletMap({ height = 360 }) {
       }
     }
 
-    // Check if Leaflet is already loaded
+    // Load Leaflet if not already loaded
     if (typeof window !== 'undefined' && window.L) {
       init()
     } else {
-      // Load Leaflet CSS if not present
+      // Load Leaflet CSS
       if (!document.querySelector('link[href*="leaflet.css"]')) {
         const link = document.createElement('link')
         link.rel = 'stylesheet'
@@ -126,7 +110,7 @@ function SimpleLeafletMap({ height = 360 }) {
         document.head.appendChild(link)
       }
 
-      // Load Leaflet JS and initialize when ready
+      // Load Leaflet JS and init when ready
       if (!document.querySelector('script[src*="leaflet.js"]')) {
         const script = document.createElement('script')
         script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
@@ -134,27 +118,36 @@ function SimpleLeafletMap({ height = 360 }) {
         script.onload = init
         script.onerror = () => console.error('Failed to load Leaflet')
         document.body.appendChild(script)
+      } else {
+        // If script is already loading, wait for onload
+        const existingScript = document.querySelector('script[src*="leaflet.js"]')
+        if (existingScript) {
+          if (existingScript.onload) {
+            const oldOnload = existingScript.onload
+            existingScript.onload = () => {
+              oldOnload()
+              init()
+            }
+          } else {
+            existingScript.onload = init
+          }
+        }
       }
     }
 
-    // Cleanup on unmount
+    // Cleanup
     return () => {
-      try {
-        if (mapInstance.current) {
-          mapInstance.current.remove()
-          mapInstance.current = null
-        }
-      } catch (err) {
-        console.error('Leaflet cleanup error:', err)
+      if (mapInstance.current) {
+        mapInstance.current.remove()
+        mapInstance.current = null
       }
     }
-  }, []) // Empty dependency array - run once on mount
+  }, [])
 
   return <Box ref={mapRef} sx={{ height, borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }} />
 }
 
 function SimpleCalendar({ monthDays = 28, events = [] }) {
-  // Render a simple Sun-Sat grid with days 1..monthDays
   const headers = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const days = Array.from({ length: monthDays }, (_, i) => i + 1)
 
@@ -293,154 +286,136 @@ function HubDashboard() {
     }
   }, [])
 
-  try {
-    if (typeof window === 'undefined') {
-      // Server-side - render lightweight placeholder to avoid SSR crashes
-      return (
-        <Box sx={{ fontFamily: '"Inter", sans-serif', p: 3 }}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>Loading Hub Dashboard...</Typography>
-        </Box>
-      )
-    }
-
-    if (typeof window !== 'undefined' && !socket) {
-      console.warn('HubDashboard: socket not available yet')
-      return (
-        <Box sx={{ fontFamily: '"Inter", sans-serif', p: 3 }}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>Loading...</Typography>
-        </Box>
-      )
-    }
-
+  // Loading state if map or socket is not ready
+  if (typeof window === 'undefined' || !socket) {
     return (
-      <Box sx={{ fontFamily: '"Inter", sans-serif' }}>
-        {/* Page title */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', mb: 0.5 }}>
-            Hub Dashboard
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-            Monitor inbound and outbound flows, dwell times, and verification flags at your consolidation hub.
-          </Typography>
-        </Box>
+      <Box sx={{ fontFamily: '"Inter", sans-serif', p: 3 }}>
+        <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>Loading Hub Dashboard...</Typography>
+      </Box>
+    )
+  }
 
-        {/* Live Parcel Scan Count (premium card) */}
-        <Box sx={{ mb: 4, width: '100%', display: 'flex', justifyContent: 'center' }}>
-          <Box
-            sx={{
-              ...glassCardBase,
-              maxWidth: 480,
-              width: '100%',
-              borderRadius: '28px',
-              p: { xs: 3, sm: 5 },
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 0 0 0 rgba(0,212,255,0.0)',
-              border: '2px solid rgba(0,212,255,0.18)',
-              animation: 'fadeInParcel 0.8s cubic-bezier(.4,1.4,.6,1) both',
-              transition: 'box-shadow 0.25s, border-color 0.25s, transform 0.22s',
-              '&:hover': {
-                transform: 'translateY(-4px) scale(1.025)',
-                boxShadow: '0 0 64px 0 rgba(0,212,255,0.32), 0 18px 80px rgba(0,212,255,0.10)',
-                borderColor: '#00d4ff',
-              },
-              '@keyframes fadeInParcel': {
-                '0%': { opacity: 0, transform: 'translateY(24px) scale(0.98)' },
-                '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
-              },
-            }}
-          >
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              {/* Guarded icon: ensure it's a valid React component */}
-              {typeof LocalShippingIcon === 'function' || (typeof LocalShippingIcon === 'object' && LocalShippingIcon !== null) ? (
-                <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
-              ) : (
-                <Box sx={{ fontSize: 32, color: '#00d4ff', mb: 0.5 }}>🚚</Box>
-              )}
+  return (
+    <Box sx={{ fontFamily: '"Inter", sans-serif' }}>
+      {/* Page title */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', mb: 0.5 }}>
+          Hub Dashboard
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+          Monitor inbound and outbound flows, dwell times, and verification flags at your consolidation hub.
+        </Typography>
+      </Box>
 
-              <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 800, letterSpacing: '0.04em', mb: 0.5, textShadow: '0 0 16px #00d4ff33' }}>
-                Live Parcel Scans
-              </Typography>
-            </Box>
-            <Typography
-              variant="h1"
-              sx={{
-                fontWeight: 900,
-                color: '#00d4ff',
-                textShadow: '0 0 48px #00d4ff, 0 0 16px #00d4ff99',
-                fontSize: { xs: '2.8rem', sm: '3.6rem', md: '4.2rem' },
-                mb: 0.5,
-                lineHeight: 1.1,
-              }}
-            >
-              {parcelCount}
+      {/* Live Parcel Scan Count */}
+      <Box sx={{ mb: 4, width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <Box
+          sx={{
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)',
+            backdropFilter: 'blur(22px)',
+            borderRadius: '28px',
+            border: '1px solid rgba(255,255,255,0.04)',
+            p: { xs: 3, sm: 5 },
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 0 0 0 rgba(0,212,255,0.0)',
+            border: '2px solid rgba(0,212,255,0.18)',
+            animation: 'fadeInParcel 0.8s cubic-bezier(.4,1.4,.6,1) both',
+            transition: 'box-shadow 0.25s, border-color 0.25s, transform 0.22s',
+            '&:hover': {
+              transform: 'translateY(-4px) scale(1.025)',
+              boxShadow: '0 0 64px 0 rgba(0,212,255,0.32), 0 18px 80px rgba(0,212,255,0.10)',
+              borderColor: '#00d4ff',
+            },
+            '@keyframes fadeInParcel': {
+              '0%': { opacity: 0, transform: 'translateY(24px) scale(0.98)' },
+              '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+            <LocalShippingIcon sx={{ fontSize: 48, color: '#00d4ff', mb: 0.5, filter: 'drop-shadow(0 0 16px #00d4ff44)' }} />
+            <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 800, letterSpacing: '0.04em', mb: 0.5, textShadow: '0 0 16px #00d4ff33' }}>
+              Live Parcel Scans
             </Typography>
           </Box>
-        </Box>
-
-        {/* Live QR Scan Counts */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 2 }}>
-            Live QR Scan Counts
+          <Typography
+            variant="h1"
+            sx={{
+              fontWeight: 900,
+              color: '#00d4ff',
+              textShadow: '0 0 48px #00d4ff, 0 0 16px #00d4ff99',
+              fontSize: { xs: '2.8rem', sm: '3.6rem', md: '4.2rem' },
+              mb: 0.5,
+              lineHeight: 1.1,
+            }}
+          >
+            {parcelCount}
           </Typography>
-
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
-              <Box sx={{ ...glassCardBase, p: 3, textAlign: 'center', border: '1px solid rgba(0,212,255,0.12)' }}>
-                <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
-                  Company A
-                </Typography>
-                <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1 }}>{countA}</Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <Box sx={{ ...glassCardBase, p: 3, textAlign: 'center', border: `1px solid ${orangeAccent}` }}>
-                <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
-                  Company B
-                </Typography>
-                <Typography variant="h2" sx={{ fontWeight: 900, color: orangeAccent, mt: 1 }}>{countB}</Typography>
-              </Box>
-            </Grid>
-          </Grid>
         </Box>
+      </Box>
 
-        {/* Top stats row — 3 small glass cards with neon numbers */}
-        <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 4 }}>
-          {STATS?.map((stat) => (
-            <Grid item xs={12} sm={4} key={stat.label}>
-              <Box sx={{ ...glassCardBase, p: 3, height: '100%' }}>
-                <Typography variant="overline" sx={{ color: 'rgba(255, 255, 255, 0.65)', letterSpacing: '0.12em', fontWeight: 600, display: 'block' }}>
-                  {stat.label}
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: '#00d4ff', textShadow: '0 0 28px rgba(0,212,255,0.6)', letterSpacing: '-0.03em', mt: 0.75 }}>
-                  {stat.value}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', display: 'block', mt: 0.75 }}>{stat.sub}</Typography>
-              </Box>
-            </Grid>
-          ))}
+      {/* Live QR Scan Counts */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 2 }}>
+          Live QR Scan Counts
+        </Typography>
+
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 0.22s', '&:hover': { transform: 'scale(1.02)' } }}>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
+                Company A
+              </Typography>
+              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00d4ff', mt: 1 }}>{countA}</Typography>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, textAlign: 'center', transition: 'transform 0.22s', '&:hover': { transform: 'scale(1.02)' } }}>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
+                Company B
+              </Typography>
+              <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff6bcb', mt: 1 }}>{countB}</Typography>
+            </Box>
+          </Grid>
         </Grid>
+      </Box>
+
+      {/* Top stats row */}
+      <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 4 }}>
+        {STATS.map((stat) => (
+          <Grid item xs={12} sm={4} key={stat.label}>
+            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, height: '100%' }}>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>
+                {stat.label}
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: '#00d4ff', textShadow: '0 0 28px rgba(0,212,255,0.6)', letterSpacing: '-0.03em', mt: 0.75 }}>
+                {stat.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mt: 0.75 }}>{stat.sub}</Typography>
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
 
       {/* Main content: Map + Logs and Calendar */}
       <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
         <Grid item xs={12} md={6}>
-          <Box sx={{ ...glassCardBase, p: 3, minHeight: 440, border: `2px solid ${strongCyan}`, boxShadow: `0 6px 36px rgba(0,0,0,0.32), 0 0 84px rgba(0,212,255,0.12)` }}>
+          <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, minHeight: 440 }}>
             <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 600, mb: 1 }}>
               Live Tracking Map
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)', mb: 2 }}>
-              Placeholder for real-time map showing active trailers, hubs and routes. Cyan border glow indicates live telemetry.
+              Placeholder for real-time map showing active trailers, hubs and routes.
             </Typography>
-            <Box sx={{ borderRadius: '14px', height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, rgba(10,14,23,0.75), rgba(20,28,48,0.5))', border: `2px solid rgba(0,212,255,0.22)`, boxShadow: 'inset 0 0 100px rgba(0,212,255,0.04)', color: 'rgba(255,255,255,0.48)', fontSize: 15, fontWeight: 500 }}>
-              Map visualization coming soon
-            </Box>
+            <SimpleLeafletMap />
           </Box>
 
           {/* Calendar below map */}
           <Box sx={{ mt: 3 }}>
-            <Box sx={{ ...glassCardBase, p: 3 }}>
+            <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3 }}>
               <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 600, mb: 1 }}>Operational Calendar</Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 2 }}>Weekly overview (Sun–Sat) with upcoming deployments and events.</Typography>
               <SimpleCalendar monthDays={28} events={calendarEvents} />
@@ -449,17 +424,17 @@ function HubDashboard() {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Box sx={{ ...glassCardBase, p: 3, height: '100%', minHeight: 440, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, height: '100%', minHeight: 440, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
               <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 600 }}>Verification Logs</Typography>
               <Button size="small" variant="text" sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'none' }}>View all</Button>
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto', flex: 1 }}>
-              {SAMPLE_LOGS?.map((log) => {
+              {SAMPLE_LOGS.map((log) => {
                 const config = statusConfig[log.status] || statusConfig.passed
                 return (
-                  <Box key={log.id} sx={{ ...glassCardBase, p: 2.5, '&:hover': { transform: 'scale(1.02)', boxShadow: `0 18px 56px rgba(0,0,0,0.36), 0 0 64px rgba(0,212,255,0.16)` } }}>
+                  <Box key={log.id} sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 2.5, transition: 'transform 0.22s', '&:hover': { transform: 'scale(1.02)' } }}>
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.25 }}>
                       <Avatar sx={{ width: 44, height: 44, bgcolor: 'rgba(0, 212, 255, 0.14)', border: '1px solid rgba(0, 212, 255, 0.28)', color: '#00d4ff', fontWeight: 700, fontSize: '1rem', flexShrink: 0 }}>{entityInitial(log.entity)}</Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -481,10 +456,10 @@ function HubDashboard() {
         {/* Bottom: Hub Analytics */}
         <Grid item xs={12} sx={{ mt: 2 }}>
           <Grid container spacing={2}>
-            {HUB_METRICS?.map((m) => (
+            {HUB_METRICS.map((m) => (
               <Grid item xs={12} sm={6} md={3} key={m.label}>
-                <Box sx={{ ...glassCardBase, p: 3, display: 'flex', flexDirection: 'column', gap: 1.25, alignItems: 'flex-start' }}>
-                  <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.12em', fontWeight: 700 }}>{m.label}</Typography>
+                <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3, display: 'flex', flexDirection: 'column', gap: 1.25, alignItems: 'flex-start' }}>
+                  <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.12em', fontWeight: 700, display: 'block' }}>{m.label}</Typography>
                   <Typography variant="h5" sx={{ color: '#00d4ff', fontWeight: 900, textShadow: '0 0 20px rgba(0,212,255,0.36)' }}>{m.value}</Typography>
                 </Box>
               </Grid>
@@ -494,15 +469,15 @@ function HubDashboard() {
 
         {/* Network Intelligence Live */}
         <Grid item xs={12} sx={{ mt: 3 }}>
-          <Box sx={{ ...glassCardBase, p: 3 }}>
+          <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 3 }}>
             <Typography variant="h6" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 2 }}>Network Intelligence Live</Typography>
 
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
-                <Box sx={{ ...glassCardBase, p: 2 }}>
+                <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 2 }}>
                   <Typography variant="subtitle1" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 1 }}>Today's Logistics</Typography>
                   <List sx={{ maxHeight: 320, overflow: 'auto' }}>
-                    {NETWORK_ITEMS?.map((it, idx) => (
+                    {NETWORK_ITEMS.map((it, idx) => (
                       <Box key={it.time + it.name}>
                         <ListItem sx={{ alignItems: 'flex-start', py: 1.25 }}>
                           <ListItemAvatar>
@@ -514,7 +489,7 @@ function HubDashboard() {
                             secondary={<Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>{it.note}</Typography>}
                           />
                         </ListItem>
-                        {idx < (NETWORK_ITEMS?.length ?? 0) - 1 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}
+                        {idx < NETWORK_ITEMS.length - 1 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}
                       </Box>
                     ))}
                   </List>
@@ -522,7 +497,7 @@ function HubDashboard() {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <Box sx={{ ...glassCardBase, p: 2 }}>
+                <Box sx={{ background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.7) 50%, rgba(15, 23, 42, 0.9) 100%)', backdropFilter: 'blur(22px)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.04)', p: 2 }}>
                   <Typography variant="subtitle1" sx={{ color: '#f1f5f9', fontWeight: 700, mb: 1 }}>Regional Map — Tamil Nadu (Coimbatore)</Typography>
                   <SimpleLeafletMap />
                 </Box>
@@ -533,14 +508,6 @@ function HubDashboard() {
       </Grid>
     </Box>
   )
-  } catch (err) {
-    console.error('HubDashboard render error:', err)
-    return (
-      <Box sx={{ fontFamily: '"Inter", sans-serif', p: 3 }}>
-        <Typography color="error">Hub crashed - check console (F12)</Typography>
-      </Box>
-    )
-  }
 }
 
 export default HubDashboard
